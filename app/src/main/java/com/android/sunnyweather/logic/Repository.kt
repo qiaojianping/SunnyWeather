@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import java.lang.Exception
 import java.lang.RuntimeException
 import kotlin.Result.Companion
+import kotlin.coroutines.CoroutineContext
 
 /**
  *
@@ -17,18 +18,23 @@ import kotlin.Result.Companion
  */
 object Repository {
 
-    fun searchPlaces(query: String) = liveData(Dispatchers.IO) {
-        val result = try {
-            val placeResponse = SunnyWeatherNetwork.searchPlaces(query)
-            if (placeResponse.status == "ok"){
-                val place = placeResponse.places
-                Result.success(place)
-            }else{
-                Result.failure(RuntimeException("response status is ${placeResponse.status}"))
-            }
-        }catch (e : Exception){
-            Result.failure<List<Place>>(e)
+    fun searchPlaces(query: String) = fire(Dispatchers.IO) {
+        val placeResponse = SunnyWeatherNetwork.searchPlaces(query)
+        if (placeResponse.status == "ok"){
+            val place = placeResponse.places
+            Result.success(place)
+        }else{
+            Result.failure(RuntimeException("response status is ${placeResponse.status}"))
         }
-        emit(result)
     }
+
+    private fun <T> fire(context: CoroutineContext, block: suspend () -> Result<T>) =
+        liveData<Result<T>>(context) {
+            val result = try {
+                block()
+            } catch (e: Exception) {
+                Result.failure<T>(e)
+            }
+            emit(result)
+        }
 }
